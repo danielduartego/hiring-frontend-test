@@ -12,7 +12,7 @@ You can present this in any way you like, with the following conditions:
 - The website must be deployed to AWS S3 (if it is not deployed there, it will encounter CORS issues)
 - You must use HighCharts for charting
 - You must use the React library for building the user interface
-- Please DO NOT use create-react-app to generate your submission. I want to assess your ability to configure webpack.
+- Please DO NOT use create-react-app to generate your submission. I want to assess your ability to configure webpack and generate the published files.
 
 ## Example
 
