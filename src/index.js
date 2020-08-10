@@ -1,5 +1,6 @@
-import React from 'react';
-import ReactDOM, { render } from 'react-dom';
+import React, { Component } from 'react';
+import ReactDOM from 'react-dom';
+import moment from 'moment';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 
@@ -8,81 +9,90 @@ class App extends React.Component {
         super(props);
         this.state = {
             isLoading: true,
-            chartData: {
-                title: {
-                    text: 'Evapo Chart',
-                },
-                yAxis: [
-                    {
-                        title: {
-                            text: 'Evapotranspiration ',
-                        },
-                    },
-                ],
-                xAxis: {
-                    title: {
-                        text: 'Date',
-                    },
-                    categories: ['Aug 5', 'Aug 5', 'Aug 7'],
-                },
-                series: [],
-            },
+            chartData: {},
         };
     }
 
     componentDidMount() {
-        this.setState({
-            isLoading: false,
+        let $ = this;
+        // Already prepared for the "from - to" api
+        let today = moment().format('YYYY-MM-DD');
+        let from = moment(today).subtract(7, 'days').format('YYYY-MM-DD');
+        let to = today;
+        let currentDate = from;
+        let dateRange = [];
+        let promises = [];
+        // Build a dateRange array with dates to fech the API
+        while (currentDate < to) {
+            dateRange.push(moment(currentDate).format('YYYY-MM-DD'));
+            currentDate = moment(currentDate)
+                .add(1, 'days')
+                .format('YYYY-MM-DD');
+        }
+
+        // Loop to creaate an array with promises
+        dateRange.forEach(function (date) {
+            promises.push(
+                `https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=${date}&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51`
+            );
         });
-        Promise.all([
-            fetch(
-                'https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-08-05&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51'
-            ),
-            fetch(
-                'https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-08-06&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51'
-            ),
-            fetch(
-                'https://stage.altrac-api.com/evapo/address/26002e000c51343334363138?date=2020-08-07&tzOffset=-7&elevation=160.9&latitude=43.2624613&Kc=0.51'
-            ),
-        ])
-            .then(([res1, res2, res3]) => {
-                return Promise.all([res1.json(), res2.json(), res3.json()]);
-            })
-            .then(([res1, res2, res3]) => {
-                this.setState({
+        // Execute the promise
+        Promise.all(promises.map((url) => fetch(url)))
+            .then((responses) =>
+                Promise.all(responses.map((res) => res.json()))
+            )
+            .then(function (result) {
+                let temp = [];
+                let solar = [];
+                let evapo = [];
+
+                for (var i = 0; i < result.length; i++) {
+                    temp.push(result[i].meanDailyAirTemperatureC);
+                    solar.push(result[i].meanSolarRadiationMJ);
+                    evapo.push(result[i].evapotranspirationIN);
+                }
+                // Update the data
+                $.setState({
                     isLoading: false,
                     chartData: {
+                        title: {
+                            text: 'Evapo Chart',
+                        },
+                        yAxis: [
+                            {
+                                title: {
+                                    text: 'Evapotranspiration ',
+                                },
+                            },
+                        ],
+                        xAxis: {
+                            title: {
+                                text: 'Date',
+                            },
+                            categories: dateRange,
+                        },
                         series: [
                             {
-                                name: 'Temperature (F)',
+                                name: 'Temperature (C)',
                                 type: 'line',
-                                data: [
-                                    res1.meanDailyAirTemperatureC,
-                                    res2.meanDailyAirTemperatureC,
-                                    res3.meanDailyAirTemperatureC,
-                                ],
+                                data: temp,
                             },
                             {
                                 name: 'Solar (MJ)',
                                 type: 'line',
-                                data: [
-                                    res1.meanSolarRadiationMJ,
-                                    res2.meanSolarRadiationMJ,
-                                    res3.meanSolarRadiationMJ,
-                                ],
+                                data: solar,
                             },
                             {
                                 name: 'Evapo (In)',
                                 type: 'line',
-                                data: [
-                                    res1.evapotranspirationIN,
-                                    res2.evapotranspirationIN,
-                                    res3.evapotranspirationIN,
-                                ],
+                                data: evapo,
                             },
                         ],
                     },
                 });
+            })
+            .catch((error) => {
+                console.log(error);
             });
     }
     render() {
